@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+
+<html>
+
+  <head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+    <meta http-equiv="x-ua-compatible" content="IE=edge">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, target-densitydpi=medium-dpi">
+
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <title>Appsulate</title>
+
+  </head>
+
+  <body style="margin:0!important; padding:0!important;" onload="myfunction()">
+
+
+    <!-- Guacamole Client -->
+
+    <script type="text/javascript" src="guacamole-common.js" type="module">
+    
+    </script>
+
+   <!-- <button type="button" id="usehere">Click me!</button>  -->
+   <div id="display"></div>
+    <script type="text/javascript">
+      function myfunction() { 
+      var height = document.documentElement.clientHeight;
+      var width = document.documentElement.clientWidth;
+      console.log("height, width", height, width);
+      var tunnel = new Guacamole.WebSocketTunnel(`ws://localhost:8888/ws?height=${height}&width=${width}`);
+      // var tunnel = new Guacamole.WebSocketTunnel('ws://localhost:8000/ws?token=eyJpdiI6IkNucFJSM1ZMQmQ2K2xGdlRITE11N1E9PSIsInZhbHVlIjoiNFNJQm9SYm9uczIydXFReHU5d2t4VnIrM0FBVkN5dmk2SFNUVkc1WGltN1R3K3pOYlhpZXVIbCtDUGNNaW5zVE83UVNYblhFcHBtM1puakNlQ0FsZmtOLzUrSk1kL1RWbmRpYjgrMFBlRXRTYkJlN2xIaFUzaEM0VE9TZ0FDM0hBTGJLK0k1aURpUHpvaEIrR05IUTBBPT0ifQ==');
+      // var tunnel = new Guacamole.WebSocketTunnel('ws://localhost:8888/ws?height=${height}&width=${width}');
+      
+      var client = new Guacamole.Client(tunnel);
+      if (document.getElementById("display").hasChildNodes()) {
+        var list = document.getElementById("display")
+        list.removeChild(list.childNodes[0])
+      }
+      document.getElementById("display").appendChild(client.getDisplay().getElement());
+      // document.body.appendChild(client.getDisplay().getElement());
+      client.connect();
+      
+      // document.getElementById("usehere").addEventListener("click", function () {
+      // })
+
+
+
+      var mouse = new Guacamole.Mouse(client.getDisplay().getElement());
+
+      mouse.onmousedown = 
+      mouse.onmouseup = 
+      mouse.onmousemove = function(mouseState) {
+        client.sendMouseState(mouseState);
+      }
+
+      var keyboard = new Guacamole.Keyboard(document);
+
+      keyboard.onkeydown = function(keysym) {
+        client.sendKeyEvent(1, keysym);
+      }
+
+      keyboard.onkeyup = function (keysym) {
+        client.sendKeyEvent(0, keysym);
+      }
+    }
+
+    // document.getElementById("usehere").addEventListener("click",  myfunction)
+
+    </script>
+
+
+  </body>
+
+</html>
