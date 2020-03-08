@@ -1,0 +1,9 @@
+# Start from the latest golang base image
+FROM golang:alpine
+RUN apk update && apk add bash
+COPY guacamole-client-go .
+COPY index.html .
+COPY guacamole-common.js .
+COPY index.js .
+EXPOSE 8888
+ENTRYPOINT ["./go/guacamole-client-go"]
