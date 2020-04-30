@@ -109,6 +109,8 @@ func (connection *Connection) Serve() {
 	go connection.readFromWS()
 	go connection.sendToGuacd()
 	go connection.sendToWS()
+	// go connection.fromGuacd()
+	// go connection.fromWS()
 }
 
 func (connection *Connection) Close() {
@@ -154,6 +156,42 @@ func (connection *Connection) readFromGuacd() {
 		buf = buf[index+1:]
 	}
 }
+
+//this function uses io.Copy to send streams from Guacd to WS
+// func (connection *Connection) fromGuacd() {
+// 	for connection.Active {
+// 		writer, err := connection.WsConnection.NextWriter(websocket.TextMessage)
+
+// 		written, err := io.Copy(writer, connection.GuacdConnection)
+// 		if err != nil {
+// 			log.Println(err)
+// 		}
+// 		log.Println("Written to WS: ", written)
+
+// 	}
+
+// }
+
+//this function uses io.Copy to send streams from WS to Guacd
+// func (connection *Connection) fromWS() {
+
+// 	for connection.Active {
+// 		//get io.Reader from WS connection
+// 		_, reader, err := connection.WsConnection.NextReader()
+// 		if err != nil {
+// 			log.Println("read: ", err)
+// 			break
+// 		}
+
+// 		delimWriter = net.
+
+// 		written, err := io.Copy(connection.GuacdConnection, reader)
+// 		if err != nil {
+// 			panic(err)
+// 		}
+// 		log.Println("Written to guacd: ", written)
+// 	}
+// }
 
 func (connection *Connection) sendToWS() {
 	for connection.Active {

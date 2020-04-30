@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var userPods map[string]*guac.UserConfig
@@ -31,6 +33,9 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	height := r.URL.Query()["height"]
 	heightParam, _ := strconv.Atoi(height[0])
 
+	username := r.URL.Query()["username"]
+	fmt.Println(username)
+
 	respHeader := make(http.Header)
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	conn, err := upgrader.Upgrade(w, r, respHeader)
@@ -42,12 +47,8 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	guacdAddr, err := net.ResolveTCPAddr("", "guacd:4822")
 
 	connectionParams := &guac.ConnectionParams{
-		Protocol:  viper.GetString("protocol"),
-		GuacdAddr: guacdAddr,
-		// GuacdAddr: &net.TCPAddr{
-		// 	IP:   net.ParseIP(viper.GetString("guacd_address")),
-		// 	Port: viper.GetInt("guacd_port"),
-		// },
+		Protocol:       viper.GetString("protocol"),
+		GuacdAddr:      guacdAddr,
 		RdpHostname:    "endpoint",
 		RdpPort:        viper.GetString("rdp_port"),
 		DisplayWidth:   widthParam,
@@ -107,10 +108,13 @@ func main() {
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(w, r)
 	})
+	http.Handle("/metrics", promhttp.Handler())
 
 	err := http.ListenAndServe("0.0.0.0:8888", nil)
 	log.Println("Server started")
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
+
+	log.Println("Prometheus server started")
 }
