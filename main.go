@@ -10,7 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"./guac"
+	"guacamole-library/guac"
+
+	"guacamole-library/redis"
 
 	"github.com/spf13/viper"
 
@@ -27,6 +29,12 @@ var upgrader = websocket.Upgrader{
 
 var endpointIP string
 
+var active int = 1
+
+func upgradeWS(w http.ResponseWriter, r *http.Request) {
+
+}
+
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	width := r.URL.Query()["width"]
 	widthParam, _ := strconv.Atoi(width[0])
@@ -35,6 +43,14 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 
 	username := r.URL.Query()["username"]
 	fmt.Println(username)
+
+	//TODO: check if username is mapped with an existing connection
+	hostname, connectionID := redis.GetConn(username[0])
+
+	if hostname == "" {
+		hostname = viper.GetString("rdp_hostname") + string(active)
+		active++
+	}
 
 	respHeader := make(http.Header)
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -49,13 +65,15 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	connectionParams := &guac.ConnectionParams{
 		Protocol:       viper.GetString("protocol"),
 		GuacdAddr:      guacdAddr,
-		RdpHostname:    "endpoint",
+		RdpHostname:    "stackdemo_endpoint.1",
 		RdpPort:        viper.GetString("rdp_port"),
 		DisplayWidth:   widthParam,
 		DisplayHeight:  heightParam,
 		DisplayDensity: viper.GetInt("display_density"),
 		RdpUsername:    viper.GetString("rdp_username"),
 		RdpPassword:    viper.GetString("rdp_password"),
+		ConnectionID:   connectionID,
+		Username:       username[0],
 	}
 
 	guacConn, _ := guac.NewConnection(*connectionParams, conn)
@@ -99,8 +117,10 @@ func main() {
 	viper.SetDefault("rdp_username", "alpine")
 	viper.SetDefault("rdp_password", "alpine")
 	viper.SetDefault("guacd_address", "127.0.0.1")
+	viper.SetDefault("rdp_hostname", "stackdemo_endpoint.")
 
 	//initiate instance manager client
+	redis.InitRedisClient()
 
 	http.HandleFunc("/", staticHandler)
 	//call server http handler

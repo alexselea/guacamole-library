@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	red "guacamole-library/redis"
+
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -41,6 +43,7 @@ type ConnectionParams struct {
 	IgnoreCert        bool
 	ConnectionID      string
 	ActiveConnections int
+	Username          string
 }
 
 type Connection struct {
@@ -90,7 +93,6 @@ func (connection *Connection) Serve() {
 	} else {
 		selectInstruction := MakeInstruction("select", *connection.ConnectionID)
 		connection.GuacdConnection.Write(selectInstruction)
-
 	}
 
 	guacdHandshake := make([]byte, 2000)
@@ -147,6 +149,12 @@ func (connection *Connection) readFromGuacd() {
 			if bytes.Contains(inst.getInstruction(), []byte("ready")) {
 				parameters := inst.getPayloadParameters()
 				connection.ConnectionID = &parameters[1]
+
+				username := connection.ConnParams.Username
+				hostname := connection.ConnParams.RdpHostname
+
+				red.PutNewConnectionOf(username, hostname, *connection.ConnectionID)
+
 			}
 			if bytes.Contains(inst.getInstruction(), []byte("error")) {
 				connection.GuacMessages <- string(*inst.Payload)
