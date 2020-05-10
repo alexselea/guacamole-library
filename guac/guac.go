@@ -2,10 +2,10 @@ package guac
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"net"
 	"strconv"
-	"strings"
 
 	red "guacamole-library/redis"
 
@@ -47,7 +47,6 @@ type ConnectionParams struct {
 }
 
 type Connection struct {
-	ConnectionID    *string
 	ConnParams      ConnectionParams
 	ToFrontend      chan []byte
 	ToGuacd         chan []byte
@@ -86,12 +85,14 @@ func NewConnection(params ConnectionParams, ws *websocket.Conn) (*Connection, er
 func (connection *Connection) Serve() {
 	//start guacd handshake
 
-	if connection.ConnectionID == nil {
+	log.Printf("%+v\n", *connection)
+	log.Printf("%+v\n", *&connection.ConnParams)
+	if *&connection.ConnParams.ConnectionID == "" {
 		selectInstruction := MakeInstruction("select", connection.ConnParams.Protocol)
 		connection.GuacdConnection.Write(selectInstruction)
 
 	} else {
-		selectInstruction := MakeInstruction("select", *connection.ConnectionID)
+		selectInstruction := MakeInstruction("select", connection.ConnParams.ConnectionID)
 		connection.GuacdConnection.Write(selectInstruction)
 	}
 
@@ -109,8 +110,8 @@ func (connection *Connection) Serve() {
 
 	go connection.readFromGuacd()
 	go connection.readFromWS()
-	go connection.sendToGuacd()
-	go connection.sendToWS()
+	// go connection.sendToGuacd()
+	// go connection.sendToWS()
 	// go connection.fromGuacd()
 	// go connection.fromWS()
 }
@@ -135,33 +136,62 @@ func (connection *Connection) readFromGuacd() {
 
 		buf = append(buf, s...)
 
-		index := strings.LastIndex(string(buf), ";")
+		index := bytes.LastIndex(buf, []byte(";"))
+		// index := strings.LastIndex(string(buf), ";")
 
 		if index != -1 {
-			connection.ToFrontend <- buf[:index+1]
+			connection.WsConnection.WriteMessage(websocket.TextMessage, buf[:index+1])
+			// connection.ToFrontend <- buf[:index+1]
 			inst := parseInstructionByte((buf[:index+1]))
 			// log.Println("Guacd to channel: ", inst.getInstruction(), string(inst.getPayload()))
 
-			if bytes.Contains(inst.getInstruction(), []byte("disconnect")) {
+			if bytes.Contains(buf[:index+1], []byte("disconnect")) {
 				Disconnected = true
 			}
 
-			if bytes.Contains(inst.getInstruction(), []byte("ready")) {
+			if bytes.Contains(buf[:index+1], []byte("ready")) {
 				parameters := inst.getPayloadParameters()
-				connection.ConnectionID = &parameters[1]
+				connection.ConnParams.ConnectionID = *&parameters[1]
+				log.Println(connection.ConnParams.ConnectionID)
 
 				username := connection.ConnParams.Username
 				hostname := connection.ConnParams.RdpHostname
 
-				red.PutNewConnectionOf(username, hostname, *connection.ConnectionID)
+				red.PutNewConnectionOf(username, hostname, connection.ConnParams.ConnectionID)
 
 			}
-			if bytes.Contains(inst.getInstruction(), []byte("error")) {
+			if bytes.Contains(buf[:index+1], []byte("error")) {
 				connection.GuacMessages <- string(*inst.Payload)
 			}
 		}
 		//add remaining chunk of instructions to buffer
 		buf = buf[index+1:]
+	}
+}
+
+func (connection *Connection) readFromGuacd2() {
+	for connection.Active {
+		_, err := io.Copy(connection.GuacdConnection, connection.WsConnection.UnderlyingConn())
+		if err != nil {
+			log.Println(err)
+			break
+		}
+	}
+}
+
+func (connection *Connection) readFromWS2() {
+	for connection.Active {
+		_, err := io.Copy(connection.WsConnection.UnderlyingConn(), connection.GuacdConnection)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		_, err = io.Copy(connection.GuacdConnection, connection.WsConnection.UnderlyingConn())
+		if err != nil {
+			log.Println(err)
+			break
+		}
+
 	}
 }
 
@@ -227,23 +257,9 @@ func (connection *Connection) readFromWS() {
 			connection.GuacMessages <- "Error readFromWS"
 			return
 		}
+		// io.Copy(connection.GuacdConnection, connection.WsConnection.UnderlyingConn())
+		connection.GuacdConnection.Write(s)
 
-		if len(connection.BeforeFilters) == 0 {
-			connection.ToGuacd <- s
-			// log.Println("WS to channel: ", inst.getInstruction(), string(inst.getPayload()))
-
-		} else {
-			inst := parseInstructionByte(s)
-
-			// log.Println("filter pass")
-			for _, fn := range connection.BeforeFilters {
-				bool := fn(inst.getInstructionString())
-				if bool == false {
-					connection.ToGuacd <- s
-					// log.Println("WS to channel: ", inst.getInstruction(), string(inst.getPayload()))
-				}
-			}
-		}
 	}
 }
 
