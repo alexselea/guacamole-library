@@ -34,7 +34,7 @@ var upgrader = websocket.Upgrader{
 
 var endpointIP string
 
-var active int = 1
+var active int = 0
 
 func upgradeWS(w http.ResponseWriter, r *http.Request) {
 
@@ -74,7 +74,6 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 	username := r.URL.Query()["username"]
 	fmt.Println(username)
 
-	//TODO: check if username is mapped with an existing connection
 	hostname, connectionID := redis.GetConn(username[0])
 	fmt.Println("hostname, connectionID: ", hostname, connectionID)
 
